@@ -13,9 +13,13 @@ class VDSR:
         for i in range(0,self.m):
             x = tf.keras.layers.Conv2D(filters = self.s, kernel_size = [3,3], padding='same', activation = self.activation, kernel_initializer = 'he_uniform')(x)
 
-        x = tf.keras.layers.Conv2D(filters = self.s, kernel_size = [3,3], padding='same', activation = tf.keras.activations.linear, kernel_initializer = 'he_uniform')(x)
+        x = tf.keras.layers.Conv2D(filters = self.input_shape[-1], kernel_size = [3,3], padding='same', activation = tf.keras.activations.linear, kernel_initializer = 'he_uniform')(x)
         prediction = tf.keras.layers.Add()([inputs, x])
         model = tf.keras.Model(inputs = inputs, outputs = prediction)
         model.summary()
         return model
+
+
+if __name__ =='__main__':
+    VDSR(d = 8, s = 4, m= 2, input_shape=[10, 180, 12]).build_model()
 
