@@ -41,12 +41,34 @@ def get_data_by_frame(file_path, frame_idx):
             x_data.append(xx['x_data'])
             y_data.append(xx['y_data'])
 
+    L = np.size(x_data, 0)
+    x_data = np.reshape(x_data, [L * 98, 1, 180,12])
+    y_data = np.reshape(y_data, [L * 98, 1, 180,12])
+
+    L = np.size(x_data, 0)
+    train_len = int(np.ceil(0.7 * L))
+    test_len = int(np.ceil(0.15 * L))
+    val_len = int(L - train_len - test_len)
+
+    x_train = np.concatenate([np.real(x_data[0:train_len, :, :, :]), np.imag(x_data[0:train_len, :, :, :])], axis = 2)
+    y_train = np.concatenate([np.real(y_data[0:train_len, :, :, :]), np.imag(y_data[0:train_len, :, :, :])], axis = 2)
+
+    x_test = np.concatenate([np.real(x_data[train_len:train_len + test_len, :, :, :]), np.imag(x_data[train_len:train_len + test_len, :, :, :])], axis = 2)
+    y_test = np.concatenate([np.real(y_data[train_len:train_len + test_len, :, :, :]), np.imag(y_data[train_len:train_len + test_len, :, :, :])], axis = 2)
+
+    x_val = np.concatenate([np.real(x_data[train_len + test_len:L, :, :, :]), np.imag(x_data[train_len + test_len:L, :, :, :])], axis = 2)
+    y_val = np.concatenate([np.real(y_data[train_len + test_len:L, :, :, :]), np.imag(y_data[train_len + test_len:L, :, :, :])], axis = 2)
+
+    training_data = {'train_data':x_train, 'train_label':y_train, 'test_data':x_test, 'test_label':y_test, 'val_data':x_val, 'val_label':y_val}
+    return training_data
+
 
 if __name__ == '__main__':
-    #data_path = r'C:\\FMF_NN_EQ\\ori_form'
-    #training_data = data_preprocessing(data_path)
-    data_path = r'C:\\FMF_NN_EQ\\complete_frame'
-    get_data_by_frame(data_path, 5)
-    #model = VDSR(d=8, s=4, m=2, input_shape=[10, 180, 12]).build_model()
-    #train_model(training_data, model, tf.train.AdamOptimizer(0.001))
+    #np.reshape([[[1,2,3],[1,3,4]],[[3,4,5],[5,6,7]]], [4,1,3])
+    # data_path = r'C:\\FMF_NN_EQ\\ori_form'
+    # training_data = data_preprocessing(data_path)
+    data_path = r'C:\FMF_NN_EQ\complete_frame'
+    training_data = get_data_by_frame(data_path, 1)
+    model = VDSR(d=64, s=32, m=5, input_shape=[1, 360, 12]).build_model()
+    train_model(training_data, model, tf.train.AdamOptimizer(0.001))
 
