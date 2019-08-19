@@ -1,8 +1,9 @@
 import os
 import tensorflow as tf
 import json
+from customize_callbacks.ConstellationCallback import ConstellationCallbacks
 
-def train_model(training_data, val_data, model, optimizer):
+def train_model(training_data, test_data, val_data, model, optimizer):
     # GPU resource configuration
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -15,9 +16,10 @@ def train_model(training_data, val_data, model, optimizer):
         # Interrupt training if `val_loss` stops improving for over 2 epochs
         tf.keras.callbacks.EarlyStopping(patience=5, monitor='val_loss'),
         # Write TensorBoard logs to `./logs` directory
-        tf.keras.callbacks.TensorBoard(log_dir='s3://obs-fmf-eq/code/training_frame1', write_graph=True,write_grads=True, write_images = True),
+        tf.keras.callbacks.TensorBoard(log_dir='s3://obs-fmf-eq/code/training_frame1', write_graph=True,write_grads=True, write_images = False),
         # Create checkpoint callback
-        tf.keras.callbacks.ModelCheckpoint(checkpoint_path, verbose=1, save_weights_only=True, period=50)
+        tf.keras.callbacks.ModelCheckpoint(checkpoint_path, verbose=1, save_weights_only=True, period=50),
+        ConstellationCallbacks(logdir = 's3://obs-fmf-eq/code/training_frame1', period = 100)
     ]
 
     # session to config the resource and do weights initialization
@@ -37,5 +39,5 @@ def train_model(training_data, val_data, model, optimizer):
 
     # evaluate
     print('\n# Evaluate on test data')
-    results = model.evaluate(training_data['test_data'], training_data['test_label'], batch_size=256)
+    results = model.evaluate(test_data['test_data'], test_data['test_label'], batch_size=256)
     print('test loss, test acc:', results)

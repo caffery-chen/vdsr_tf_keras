@@ -60,6 +60,27 @@ def get_data_by_frame(file_path, frame_idx):
     training_data = {'train_data':x_train, 'train_label':y_train, 'test_data':x_test, 'test_label':y_test}
     return training_data
 
+def get_test_data_by_frame(file_path, frame_idx):
+    f = os.listdir(file_path)
+    x_data = []
+    y_data = []
+    for mat_file in f:
+        if '_cframe_%d' % frame_idx in mat_file:
+            xx = sio.loadmat(os.path.join(file_path, mat_file))
+            x_data.append(xx['x_data'])
+            y_data.append(xx['y_data'])
+
+    L = np.size(x_data, 0)
+    x_data = np.reshape(x_data, [L * 98, 1, 180,12])
+    y_data = np.reshape(y_data, [L * 98, 1, 180,12])
+
+    L = np.size(x_data, 0)
+    x_test = np.concatenate([np.real(x_data[0:L, :, :, :]), np.imag(x_data[0:L, :, :, :])], axis = 2)
+    y_test = np.concatenate([np.real(y_data[0:L, :, :, :]), np.imag(y_data[0:L, :, :, :])], axis = 2)
+
+    test_data = {'test_data':x_test, 'test_label':y_test}
+    return test_data
+
 def get_val_data_by_frame(file_path, frame_idx):
     f = os.listdir(file_path)
     x_data = []
@@ -81,14 +102,14 @@ def get_val_data_by_frame(file_path, frame_idx):
     val_data = {'val_data':x_val, 'val_label':y_val}
     return val_data
 
-
 if __name__ == '__main__':
     #np.reshape([[[1,2,3],[1,3,4]],[[3,4,5],[5,6,7]]], [4,1,3])
     # data_path = r'C:\\FMF_NN_EQ\\ori_form'
     # training_data = data_preprocessing(data_path)
     data_path = r's3://obs-fmf-eq/frame_data'
     training_data = get_data_by_frame(data_path, 1)
+    test_data = get_test_data_by_frame(data_path, 5)
     val_data = get_val_data_by_frame(data_path, 3)
     model = VDSR(d=64, s=32, m=5, input_shape=[1, 360, 12]).build_model()
-    train_model(training_data, val_data, model, tf.train.AdamOptimizer(0.001))
+    train_model(training_data, test_data, val_data, model, tf.train.AdamOptimizer(0.001))
 
