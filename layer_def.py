@@ -43,3 +43,15 @@ if __name__ == "__main__":
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
         tf.summary.scalar('cross_entropy', xent)
         tf.summary.scalar('accuracy', accuracy)
+
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+
+    for i in range(2000):
+        batch = mnist.train.next_batch(100)
+
+        if i % 500 ==0:
+            [train_accuracy] = sess.run([accuracy], feed_dict={x: batch[0], y:batch[1]})
+            print("step %d, training accuracy %g" % (i, train_accuracy))
+
+        sess.run(train_step, feed_dict={x: batch[0], y_true: batch[1]})
