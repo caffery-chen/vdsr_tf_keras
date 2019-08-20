@@ -14,7 +14,7 @@ class ConstellationCallbacks(Callback):
 
     def gen_plot(self, y_predict):
         real_part = tf.reshape(y_predict[:,1,0:180,:], [-1])
-        imag_part = tf.reshape(y_predict[0,1,180:-1,:],[-1])
+        imag_part = tf.reshape(y_predict[:,1,180:-1,:],[-1])
         plt.figure()
         plt.scatter(real_part, imag_part)
         buf = io.BytesIO()
@@ -24,6 +24,7 @@ class ConstellationCallbacks(Callback):
 
 
     def on_epoch_end(self, epoch, logs=None):
+        self.last_rcd = self.last_rcd + 1
         if self.last_rcd >= self.period:
             self.last_rcd = 0
             y_predict = self.model.predict(self.validation_data)
@@ -40,7 +41,7 @@ class ConstellationCallbacks(Callback):
             # Add image summary
             summary_op = tf.summary.image("plot", image)
             self.writer.add_summary(summary_op)
-
+        
 
     def on_train_end(self, logs=None):
         self.writer.close()
