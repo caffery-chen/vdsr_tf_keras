@@ -102,14 +102,19 @@ def get_val_data_by_frame(file_path, frame_idx):
     val_data = {'val_data':x_val, 'val_label':y_val}
     return val_data
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
     #np.reshape([[[1,2,3],[1,3,4]],[[3,4,5],[5,6,7]]], [4,1,3])
     # data_path = r'C:\\FMF_NN_EQ\\ori_form'
     # training_data = data_preprocessing(data_path)
+def main():
     data_path = r's3://obs-fmf-eq/frame_data'
+    log_dir = r's3://obs-fmf-eq/model/08-20'
     training_data = get_data_by_frame(data_path, 1)
     test_data = get_test_data_by_frame(data_path, 5)
     val_data = get_val_data_by_frame(data_path, 3)
     model = VDSR(d=64, s=32, m=5, input_shape=[1, 360, 12]).build_model()
-    train_model(training_data, test_data, val_data, model, tf.train.AdamOptimizer(0.001))
+    train_model(training_data, test_data, val_data, model, tf.train.AdamOptimizer(0.001),log_dir)
+    
+if __name__ == '__main__':
+    main()
 

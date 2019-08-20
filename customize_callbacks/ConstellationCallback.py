@@ -10,7 +10,7 @@ class ConstellationCallbacks(Callback):
         self.logdir = logdir
         self.period = period
         self.last_rcd = 0
-        self.writer = tf_summary.FileWriter(self.log_dir)
+        self.writer = tf_summary.FileWriter(self.logdir)
 
     def gen_plot(self, y_predict):
         real_part = tf.reshape(y_predict[:,1,0:180,:], [-1])
