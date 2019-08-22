@@ -19,7 +19,7 @@ def train_model(training_data, test_data, val_data, model, optimizer, log_dir):
         #tf.keras.callbacks.TensorBoard(log_dir=log_dir, write_graph=True,write_grads=True, write_images = False),
         # Create checkpoint callback
         tf.keras.callbacks.ModelCheckpoint(checkpoint_path, verbose=1, save_weights_only=True, period=50),
-        ConstellationCallbacks(logdir = log_dir, period = 5)
+        ConstellationCallbacks(logdir = log_dir, period = 5, val_data = val_data['val_data'])
     ]
 
     # session to config the resource and do weights initialization

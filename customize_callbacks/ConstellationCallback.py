@@ -3,20 +3,23 @@ import tensorflow as tf
 from tensorflow.python.keras.callbacks import Callback
 from tensorflow.python.summary import summary as tf_summary
 import matplotlib.pyplot as plt
+plt.switch_backend('agg')
+import numpy as np
 
 class ConstellationCallbacks(Callback):
-    def __init__(self, logdir, period):
+    def __init__(self, logdir, period, val_data):
         super(ConstellationCallbacks, self).__init__()
         self.logdir = logdir
         self.period = period
         self.last_rcd = 0
         self.writer = tf_summary.FileWriter(self.logdir)
+        self.validation_data = val_data
 
     def gen_plot(self, y_predict):
-        real_part = tf.reshape(y_predict[:,1,0:180,:], [-1])
-        imag_part = tf.reshape(y_predict[:,1,180:-1,:],[-1])
+        real_part = np.reshape(y_predict[:,0,0:180,:], [-1])
+        imag_part = np.reshape(y_predict[:,0,180:360,:],[-1])
         plt.figure()
-        plt.scatter(real_part, imag_part)
+        plt.scatter(real_part[0:100], imag_part[0:100])
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)
@@ -27,7 +30,7 @@ class ConstellationCallbacks(Callback):
         self.last_rcd = self.last_rcd + 1
         if self.last_rcd >= self.period:
             self.last_rcd = 0
-            y_predict = self.model.predict(self.validation_data)
+            y_predict = self.model.predict(self.validation_data, steps = 32)
 
             # Prepare the plot
             plot_buf = self.gen_plot(y_predict)
@@ -39,8 +42,16 @@ class ConstellationCallbacks(Callback):
             image = tf.expand_dims(image, 0)
 
             # Add image summary
-            summary_op = tf.summary.image("plot", image)
-            self.writer.add_summary(summary_op)
+            # Session
+            with tf.Session() as sess:
+                # Run
+                summary_op = tf.summary.image("plot", image)
+                summary = sess.run(summary_op)
+                # Write summary
+                
+                self.writer.add_summary(summary)
+            
+            #self.writer.add_summary(summary_op.eval())
         
 
     def on_train_end(self, logs=None):
