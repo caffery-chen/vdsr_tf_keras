@@ -19,7 +19,7 @@ class ConstellationCallbacks(Callback):
         real_part = np.reshape(y_predict[:,0,0:180,:], [-1])
         imag_part = np.reshape(y_predict[:,0,180:360,:],[-1])
         plt.figure()
-        plt.scatter(real_part[0:100], imag_part[0:100])
+        plt.scatter(real_part, imag_part)
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
         buf.seek(0)

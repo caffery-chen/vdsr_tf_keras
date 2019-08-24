@@ -14,12 +14,12 @@ def train_model(training_data, test_data, val_data, model, optimizer, log_dir):
 
     callbacks = [
         # Interrupt training if `val_loss` stops improving for over 2 epochs
-        tf.keras.callbacks.EarlyStopping(patience=5, monitor='val_loss'),
+        #tf.keras.callbacks.EarlyStopping(patience=5, monitor='val_loss'),
         # Write TensorBoard logs to `./logs` directory
-        #tf.keras.callbacks.TensorBoard(log_dir=log_dir, write_graph=True,write_grads=True, write_images = False),
+        tf.keras.callbacks.TensorBoard(log_dir=log_dir, write_graph=True,write_grads=True, write_images = False),
         # Create checkpoint callback
         tf.keras.callbacks.ModelCheckpoint(checkpoint_path, verbose=1, save_weights_only=True, period=50),
-        ConstellationCallbacks(logdir = log_dir, period = 5, val_data = val_data['val_data'])
+        ConstellationCallbacks(logdir = log_dir, period = 10, val_data = val_data['val_data'][25:100,:,:,:])
     ]
 
     # session to config the resource and do weights initialization
