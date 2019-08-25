@@ -6,6 +6,7 @@ import scipy.io as sio
 import moxing as mox
 mox.file.shift('os', 'mox')
 import pdb
+import matplotlib.pyplot as plt
 
 def data_preprocessing(data_path):
     f = os.listdir(data_path)
@@ -86,11 +87,12 @@ def get_val_data_by_frame(file_path, frame_idx):
     f = os.listdir(file_path)
     x_data = []
     y_data = []
-    for mat_file in f:
-        if '_cframe_%d' % frame_idx in mat_file:
-            xx = sio.loadmat(os.path.join(file_path, mat_file))
-            x_data.append(xx['x_data'])
-            y_data.append(xx['y_data'])
+    for mat_file in f[0:2000]:
+        for frame_idx_iter in frame_idx:
+            if '_cframe_%d' % frame_idx_iter in mat_file:
+                xx = sio.loadmat(os.path.join(file_path, mat_file))
+                x_data.append(xx['x_data'])
+                y_data.append(xx['y_data'])
 
     L = np.size(x_data, 0)
     x_data = np.reshape(x_data, [L * 98, 1, 180,12])
@@ -103,6 +105,29 @@ def get_val_data_by_frame(file_path, frame_idx):
     val_data = {'val_data':x_val, 'val_label':y_val}
     return val_data
 
+def model_validation(data_path, chkpt_path, frame_idx):
+    #chkpt_path = r's3://obs-fmf-eq/model/08-24/cp-2000.ckpt'
+    
+    model = VDSR(d=64, s=32, m=5, input_shape=[1, 360, 12]).build_model()
+    model.load_weights(chkpt_path)
+    
+    val_data = get_val_data_by_frame(data_path, frame_idx)['val_data']
+    #db.set_trace()
+    y_predict = model.predict(val_data, steps = 1)    
+    print('predicted')
+    real_part = np.reshape(y_predict[:,0,0:180,:], [-1])
+    imag_part = np.reshape(y_predict[:,0,180:360,:],[-1])
+    print('start plotting')
+    print(len(real_part))
+    
+    plt.figure(100)
+    plt.scatter(real_part, imag_part)
+    plt.title('Constellation')
+    plt.grid(True)
+    plt.show()
+    #plt.savefig(r's3://obs-fmf-eq/model/08-24/constellation.png')
+    print('plot ends')
+    
 #if __name__ == '__main__':
     #np.reshape([[[1,2,3],[1,3,4]],[[3,4,5],[5,6,7]]], [4,1,3])
     # data_path = r'C:\\FMF_NN_EQ\\ori_form'
