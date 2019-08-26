@@ -128,6 +128,15 @@ def model_validation(data_path, chkpt_path, frame_idx):
     #plt.savefig(r's3://obs-fmf-eq/model/08-24/constellation.png')
     print('plot ends')
     
+def qam_demod(real_part, imag_part):
+    if real_part == -1 and imag_part == 1:
+        return np.reshape([0,0],(2,1))
+    elif real_part == 1 and imag_part == 1:
+        return np.reshape([1,0], (2,1))
+    elif real_part == 1 and imag_part == -1:
+        return np.reshape([1,1], (2,1))
+    elif real_part == -1 and imag_part == -1:
+        return np.reshape([0,1], (2,1))
 #if __name__ == '__main__':
     #np.reshape([[[1,2,3],[1,3,4]],[[3,4,5],[5,6,7]]], [4,1,3])
     # data_path = r'C:\\FMF_NN_EQ\\ori_form'
