@@ -7,6 +7,7 @@ import moxing as mox
 mox.file.shift('os', 'mox')
 import pdb
 import matplotlib.pyplot as plt
+import datetime
 
 def data_preprocessing(data_path):
     f = os.listdir(data_path)
@@ -26,10 +27,10 @@ def single_file_proc(single_data_path):
         y_data = x_data = np.zeros(shape=[74 + 24, 180, 12]) + 1j * np.zeros(shape=[74 + 24, 180, 12])
         for tri in range(0, 11):
             x_data[0:24,:,  tri] =tmp['RxPreambleArray_NN'][tri][0][0 + frame * 24: 24 + frame * 24, :]
-            x_data[24:98,:,  tri] = tmp['RxPayloadArray_NN'][tri][0][0+frame*74 : 74+frame*74 , :]
+            x_data[24:98,:,  tri] = tmp['RxPayloadArray_NN'][tri][0][0 + frame * 74 : 74 + frame * 74 , :]
 
             y_data[0:24,:,  tri] = tmp['TxPreambleArray_NN'][tri][0][0 + frame * 24: 24 + frame * 24, :]
-            y_data[24:98,:,  tri] = tmp['TxPayloadArray_NN'][tri][0][0+frame*74 : 74+frame*74 , :]
+            y_data[24:98,:,  tri] = tmp['TxPayloadArray_NN'][tri][0][0 + frame * 74 : 74 + frame * 74 , :]
 
         frame_calc =  (frame + kMemPol) if (frame + kMemPol) < 10 else (frame + kMemPol) - 9
         sio.savemat('%s\\complete_frame\\%s_cframe_%d.mat'%(os.path.dirname(os.path.dirname(single_data_path)),
@@ -87,7 +88,7 @@ def get_val_data_by_frame(file_path, frame_idx):
     f = os.listdir(file_path)
     x_data = []
     y_data = []
-    for mat_file in f[0:2000]:
+    for mat_file in f[0:50]:
         for frame_idx_iter in frame_idx:
             if '_cframe_%d' % frame_idx_iter in mat_file:
                 xx = sio.loadmat(os.path.join(file_path, mat_file))
@@ -111,9 +112,9 @@ def model_validation(data_path, chkpt_path, frame_idx):
     model = VDSR(d=64, s=32, m=5, input_shape=[1, 360, 12]).build_model()
     model.load_weights(chkpt_path)
     
-    val_data = get_val_data_by_frame(data_path, frame_idx)['val_data']
-    #db.set_trace()
-    y_predict = model.predict(val_data, steps = 1)    
+    val_data = get_val_data_by_frame(data_path, frame_idx)['val_data']    
+    y_predict = model.predict(val_data, steps = 4)    
+    
     print('predicted')
     real_part = np.reshape(y_predict[:,0,0:180,:], [-1])
     imag_part = np.reshape(y_predict[:,0,180:360,:],[-1])
@@ -128,7 +129,10 @@ def model_validation(data_path, chkpt_path, frame_idx):
     #plt.savefig(r's3://obs-fmf-eq/model/08-24/constellation.png')
     print('plot ends')
     
+    ber = calc_ber(y_predict, frame_idx[0])
+
 def qam_demod(real_part, imag_part):
+    '''
     if real_part == -1 and imag_part == 1:
         return np.reshape([0,0],(2,1))
     elif real_part == 1 and imag_part == 1:
@@ -137,17 +141,59 @@ def qam_demod(real_part, imag_part):
         return np.reshape([1,1], (2,1))
     elif real_part == -1 and imag_part == -1:
         return np.reshape([0,1], (2,1))
+    '''
+    real_part = np.round(real_part)
+    imag_part = np.round(imag_part)
+    
+    real_part_bit = np.round((real_part + 1)/2)
+    imag_part_bit = np.round(abs((imag_part -1 ))/2)
+    output_bits = np.zeros([int(2*np.size(real_part_bit, 0)), int(np.size(real_part_bit, 1))])
+    
+    output_bits[0::2, :] = real_part_bit.astype(int)
+    output_bits[1::2, :] = imag_part_bit.astype(int)
+    
+    return output_bits
+    
+def calc_ber(y_predict, frame_idx):
+    payload_bits = sio.loadmat("./payload_bits/bits_frame_%d" % frame_idx)['Payload_bits']
+    frame_length = 98
+    rx_symbol = y_predict[:,0,0:180,:] + 1j * y_predict[:,0,180:360,:]
+    frames_tested = int(np.size(y_predict,0)/frame_length)
+    
+    ber = np.zeros([frames_tested,12])
+    rx_payload = []
+    
+    for i in range(0, frames_tested):
+        fut = rx_symbol[i*frame_length + 24:(i+1)*frame_length,:,:]
+        for Tri in range(0,12):
+            output_bits = qam_demod(np.real(fut[Tri * 2 : 52 + Tri * 2,:,Tri]), np.imag(fut[Tri * 2 : 52 + Tri * 2,:,Tri]))
+            total_num_bits = output_bits.size
+            total_error = np.sum(np.sum(np.abs(output_bits-payload_bits),0))
+            ber[i, Tri] = total_error / total_num_bits
+            print('Frame Index %d; Frame#%d/%d; Tri:%d/%d: BER = %.5f' % (frame_idx, i, frames_tested, Tri, 12, ber[i,Tri]))
+
+def chkmkdir(path):
+    if not os.path.exists(path):
+        os.mkdir(path)
+        
 #if __name__ == '__main__':
     #np.reshape([[[1,2,3],[1,3,4]],[[3,4,5],[5,6,7]]], [4,1,3])
     # data_path = r'C:\\FMF_NN_EQ\\ori_form'
     # training_data = data_preprocessing(data_path)
 def main():
+    
+    now = datetime.datetime.now()        
+    log_dir = r's3://obs-fmf-eq/model/%d-%d-%d' % (now.year, now.month, now.day)
+    chkmkdir(log_dir)
+    
     data_path = r's3://obs-fmf-eq/frame_data'
-    log_dir = r's3://obs-fmf-eq/model/08-24'
+    
     training_data = get_data_by_frame(data_path, 1)
     test_data = get_test_data_by_frame(data_path, 5)#{'test_data': training_data['train_data'], 'test_label': training_data['train_label']}
     val_data = get_val_data_by_frame(data_path, 3)#{'val_data': training_data['train_data'], 'val_label': training_data['train_label']}
+    
     model = VDSR(d=64, s=32, m=5, input_shape=[1, 360, 12]).build_model()
+    
     train_model(training_data, test_data, val_data, model, tf.train.AdamOptimizer(0.001),log_dir)
     
 if __name__ == '__main__':
