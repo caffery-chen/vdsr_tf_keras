@@ -32,7 +32,7 @@ def single_file_proc(single_data_path):
             y_data[0:24,:,  tri] = tmp['TxPreambleArray_NN'][tri][0][0 + frame * 24: 24 + frame * 24, :]
             y_data[24:98,:,  tri] = tmp['TxPayloadArray_NN'][tri][0][0 + frame * 74 : 74 + frame * 74 , :]
 
-        frame_calc =  (frame + kMemPol) if (frame + kMemPol) < 10 else (frame + kMemPol) - 9
+        frame_calc =  (frame + kMemPol) if (frame + kMemPol) <= 10 else (frame + kMemPol) - 10
         sio.savemat('%s\\complete_frame\\%s_cframe_%d.mat'%(os.path.dirname(os.path.dirname(single_data_path)),
                                                            os.path.basename(single_data_path).split('.mat')[0],frame_calc), {'x_data':x_data, 'y_data':y_data})
 
@@ -106,6 +106,13 @@ def get_val_data_by_frame(file_path, frame_idx):
     val_data = {'val_data':x_val, 'val_label':y_val}
     return val_data
 
+def plot_constellation(c_number):
+    plt.figure(200)
+    plt.scatter(np.reshape(np.real(c_number),[-1]), np.reshape(np.imag(c_number),[-1]))
+    plt.title('Constellation')
+    plt.grid(True)
+    plt.show()
+    
 def model_validation(data_path, chkpt_path, frame_idx):
     #chkpt_path = r's3://obs-fmf-eq/model/08-24/cp-2000.ckpt'
     
@@ -114,24 +121,25 @@ def model_validation(data_path, chkpt_path, frame_idx):
     
     val_data = get_val_data_by_frame(data_path, frame_idx)['val_data']    
     y_predict = model.predict(val_data, steps = 4)    
-    
-    print('predicted')
-    real_part = np.reshape(y_predict[:,0,0:180,:], [-1])
-    imag_part = np.reshape(y_predict[:,0,180:360,:],[-1])
-    print('start plotting')
-    print(len(real_part))
-    
-    plt.figure(100)
-    plt.scatter(real_part, imag_part)
-    plt.title('Constellation')
-    plt.grid(True)
-    plt.show()
-    #plt.savefig(r's3://obs-fmf-eq/model/08-24/constellation.png')
-    print('plot ends')
-    
     ber = calc_ber(y_predict, frame_idx[0])
+    
+#     print('predicted')
+#     real_part = np.reshape(y_predict[:,0,0:180,:], [-1])
+#     imag_part = np.reshape(y_predict[:,0,180:360,:],[-1])
+#     print('start plotting')
+#     print(len(real_part))
+    
+#     plt.figure(100)
+#     plt.scatter(real_part, imag_part)
+#     plt.title('Constellation')
+#     plt.grid(True)
+#     plt.show()
+#     #plt.savefig(r's3://obs-fmf-eq/model/08-24/constellation.png')
+#     print('plot ends')
+    
+    
 
-def qam_demod(real_part, imag_part):
+def qam_demod(c_number):
     '''
     if real_part == -1 and imag_part == 1:
         return np.reshape([0,0],(2,1))
@@ -142,20 +150,24 @@ def qam_demod(real_part, imag_part):
     elif real_part == -1 and imag_part == -1:
         return np.reshape([0,1], (2,1))
     '''
+    real_part = np.real(c_number)
+    imag_part = np.imag(c_number)
+    
     real_part = np.round(real_part)
     imag_part = np.round(imag_part)
     
     real_part_bit = np.round((real_part + 1)/2)
     imag_part_bit = np.round(abs((imag_part -1 ))/2)
+
     output_bits = np.zeros([int(2*np.size(real_part_bit, 0)), int(np.size(real_part_bit, 1))])
     
     output_bits[0::2, :] = real_part_bit.astype(int)
     output_bits[1::2, :] = imag_part_bit.astype(int)
     
-    return output_bits
+    return output_bits    
     
 def calc_ber(y_predict, frame_idx):
-    payload_bits = sio.loadmat("./payload_bits/bits_frame_%d" % frame_idx)['Payload_bits']
+    
     frame_length = 98
     rx_symbol = y_predict[:,0,0:180,:] + 1j * y_predict[:,0,180:360,:]
     frames_tested = int(np.size(y_predict,0)/frame_length)
@@ -163,15 +175,32 @@ def calc_ber(y_predict, frame_idx):
     ber = np.zeros([frames_tested,12])
     rx_payload = []
     
-    for i in range(0, frames_tested):
-        fut = rx_symbol[i*frame_length + 24:(i+1)*frame_length,:,:]
+    for i in range(0, frames_tested):        
+        fut = rx_symbol[i*frame_length + 24:(i+1)*frame_length,:,:]       
+        
         for Tri in range(0,12):
-            output_bits = qam_demod(np.real(fut[Tri * 2 : 52 + Tri * 2,:,Tri]), np.imag(fut[Tri * 2 : 52 + Tri * 2,:,Tri]))
-            total_num_bits = output_bits.size
-            total_error = np.sum(np.sum(np.abs(output_bits-payload_bits),0))
-            ber[i, Tri] = total_error / total_num_bits
-            print('Frame Index %d; Frame#%d/%d; Tri:%d/%d: BER = %.5f' % (frame_idx, i, frames_tested, Tri, 12, ber[i,Tri]))
-
+            output_bits = qam_demod(fut[Tri * 2 : 52 + Tri * 2,:,Tri])
+            #sio.savemat('./py_output_bits.mat',{'outputs_bits':output_bits})
+            #sio.savemat('./py_output_sym.mat',{'outputs_sym': fut[Tri * 2 : 52 + Tri * 2,:,Tri]})
+            
+            #mox.file.copy('./py_output_bits.mat', 's3://obs-fmf-eq/py_output_bits.mat')
+            #mox.file.copy('./py_output_sym.mat', 's3://obs-fmf-eq/py_output_sym.mat')
+            
+            #plot_constellation(fut[Tri * 2 : 52 + Tri * 2,:,Tri])
+            kMem = 0
+            best_ber =1            
+            for frame_idx in range(1,11):
+                payload_bits = sio.loadmat("./payload_bits/bits_frame_%d" % frame_idx)['Payload_bits']
+                total_num_bits = output_bits.size
+                total_error = np.sum(np.sum(np.abs(output_bits-payload_bits),0))
+                ber_frame_idx = total_error / total_num_bits
+                if best_ber>ber_frame_idx:
+                    best_ber = ber_frame_idx
+                    k=frame_idx
+            
+            print('Matched Frame Index %d; Frame#%d/%d; Tri:%d/%d: BER = %e' % (k, i, frames_tested, Tri+1, 12, best_ber))
+            ber[i, Tri] = best_ber
+            
 def chkmkdir(path):
     if not os.path.exists(path):
         os.mkdir(path)
@@ -186,11 +215,11 @@ def main():
     log_dir = r's3://obs-fmf-eq/model/%d-%d-%d' % (now.year, now.month, now.day)
     chkmkdir(log_dir)
     
-    data_path = r's3://obs-fmf-eq/frame_data'
+    data_path = r's3://obs-fmf-eq/complete_frame'
     
     training_data = get_data_by_frame(data_path, 1)
     test_data = get_test_data_by_frame(data_path, 5)#{'test_data': training_data['train_data'], 'test_label': training_data['train_label']}
-    val_data = get_val_data_by_frame(data_path, 3)#{'val_data': training_data['train_data'], 'val_label': training_data['train_label']}
+    val_data = get_val_data_by_frame(data_path, [3])#{'val_data': training_data['train_data'], 'val_label': training_data['train_label']}
     
     model = VDSR(d=64, s=32, m=5, input_shape=[1, 360, 12]).build_model()
     
