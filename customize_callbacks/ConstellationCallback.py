@@ -3,7 +3,7 @@ import tensorflow as tf
 from tensorflow.python.keras.callbacks import Callback
 from tensorflow.python.summary import summary as tf_summary
 import matplotlib.pyplot as plt
-#plt.switch_backend('agg')
+plt.switch_backend('agg')
 import numpy as np
 
 class ConstellationCallbacks(Callback):

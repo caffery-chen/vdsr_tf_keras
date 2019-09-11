@@ -88,7 +88,7 @@ def get_val_data_by_frame(file_path, frame_idx):
     f = os.listdir(file_path)
     x_data = []
     y_data = []
-    for mat_file in f[0:50]:
+    for mat_file in f:
         for frame_idx_iter in frame_idx:
             if '_cframe_%d' % frame_idx_iter in mat_file:
                 xx = sio.loadmat(os.path.join(file_path, mat_file))
@@ -215,7 +215,7 @@ def main():
     log_dir = r's3://obs-fmf-eq/model/%d-%d-%d' % (now.year, now.month, now.day)
     chkmkdir(log_dir)
     
-    data_path = r's3://obs-fmf-eq/complete_frame'
+    data_path = r's3://obs-fmf-eq/complete_frame_new'
     
     training_data = get_data_by_frame(data_path, 1)
     test_data = get_test_data_by_frame(data_path, 5)#{'test_data': training_data['train_data'], 'test_label': training_data['train_label']}
