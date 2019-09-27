@@ -33,9 +33,9 @@ def single_file_proc(single_data_path):
             y_data[0:24,:,  tri] = tmp['TxPreambleArray_NN'][tri][0][0 + frame * 24: 24 + frame * 24, :]
             y_data[24:98,:,  tri] = tmp['TxPayloadArray_NN'][tri][0][0 + frame * 74 : 74 + frame * 74 , :]
 
-        y_data = np.reshape(y_data, [98, 1, 180, 12])
-        y_data = np.concatenate([np.real(y_data[0:98, :, :, :]), np.imag(y_data[0:98, :, :, :])], axis=2)
-        frame_calc = calc_ber(y_data)
+        y_data1 = np.reshape(y_data, [98, 1, 180, 12])
+        y_data1 = np.concatenate([np.real(y_data[0:98, :, :, :]), np.imag(y_data[0:98, :, :, :])], axis=2)
+        frame_calc = calc_ber(y_data1)
 
         sio.savemat('%s\\complete_frame\\%s_cframe_%d.mat'%(os.path.dirname(os.path.dirname(single_data_path)),
                                                           os.path.basename(single_data_path).split('.mat')[0],frame_calc), {'x_data':x_data, 'y_data':y_data})
