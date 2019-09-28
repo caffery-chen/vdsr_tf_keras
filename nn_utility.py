@@ -3,7 +3,7 @@ import tensorflow as tf
 import json
 from customize_callbacks.ConstellationCallback import ConstellationCallbacks
 
-def train_model(training_data, test_data, val_data, model, optimizer, log_dir):
+def train_model(training_data, test_data, val_data, model, optimizer, epoch, batch_size, log_dir):
     # GPU resource configuration
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -19,7 +19,7 @@ def train_model(training_data, test_data, val_data, model, optimizer, log_dir):
         tf.keras.callbacks.TensorBoard(log_dir=log_dir, write_graph=True,write_grads=True, write_images = False),
         # Create checkpoint callback
         tf.keras.callbacks.ModelCheckpoint(checkpoint_path, verbose=1, save_weights_only=True, period=50),
-        ConstellationCallbacks(logdir = log_dir, period = 10, val_data = val_data['val_data'][25:100,:,:,:])
+        ConstellationCallbacks(logdir = log_dir, period = 100, val_data = val_data['val_data'][25:100,:,:,:])
     ]
 
     # session to config the resource and do weights initialization
@@ -34,10 +34,10 @@ def train_model(training_data, test_data, val_data, model, optimizer, log_dir):
     model.save_weights(checkpoint_path.format(epoch=0))
 
     # train
-    model.fit(training_data['train_data'], training_data['train_label'], epochs=2000, batch_size=256, shuffle = True,
+    model.fit(training_data['train_data'], training_data['train_label'], epochs=epoch, batch_size=batch_size, shuffle = True,
               callbacks=callbacks,validation_data=(val_data['val_data'], val_data['val_label']))
 
     # evaluate
     print('\n# Evaluate on test data')
-    results = model.evaluate(test_data['test_data'], test_data['test_label'], batch_size=256)
+    results = model.evaluate(test_data['test_data'], test_data['test_label'], batch_size=batch_size)
     print('test loss, test acc:', results)
