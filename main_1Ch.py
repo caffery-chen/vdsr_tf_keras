@@ -164,19 +164,19 @@ def chkmkdir(path):
         os.mkdir(path)
 
 def create_framewise_database():
-    data_path = r'C:\\FMF_NN_EQ\\ori_form'
+    data_path = r'C:\\FMF_NN_EQ\\ori_frame'
     training_data = data_preprocessing(data_path)
 
-def main(nn_type='VDSR', d= 64, s=32, m=5, epoch = 2000, lr = 0.001, batch_size =256):    
+def main(nn_type='ConvNet', d= 64, s=32, m=5, epoch = 2000, lr = 0.001, batch_size =256):    
     now = datetime.datetime.now()      
     #print(flags.data_url)
     #print(flags.train_url)
-    log_dir = r's3://obs-fmf-eq/model/%s_d%d_s%d_m%d_ep%d_lr%.3f_bs%d' % (nn_type, d, s, m, epoch, lr, batch_size)
+    log_dir = r's3://obs-fmf-eq/model/%s_d%d_s%d_m%d_ep%d_lr%.3f_bs%d/V0002' % (nn_type, d, s, m, epoch, lr, batch_size)
     chkmkdir(log_dir)
     
     data_path = r's3://obs-fmf-eq/complete_frame'    
     
-    training_data = get_data_by_frame(data_path, 1, 'train')
+    training_data = get_data_by_frame(data_path, 2, 'train')
     test_data = get_data_by_frame(data_path, 5, 'test')#{'test_data': training_data['train_data'], 'test_label': training_data['train_label']}
     val_data = get_data_by_frame(data_path, 3, 'validation')#{'val_data': training_data['train_data'], 'val_label': training_data['train_label']}
     
@@ -188,5 +188,5 @@ def main(nn_type='VDSR', d= 64, s=32, m=5, epoch = 2000, lr = 0.001, batch_size 
     train_model(training_data, test_data, val_data, model, tf.train.AdamOptimizer(0.001),epoch, batch_size, log_dir)
     
 if __name__ == '__main__':
-    main(nn_type = 'VDSR')
+    main(nn_type = 'ConvNet')
 
