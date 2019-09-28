@@ -1,7 +1,7 @@
 import os
 from nn_utility import *
 from VDSR import VDSR
-from ConvNet import ConvNet
+from ConvDnnNet import ConvNet
 import numpy as np
 import scipy.io as sio
 import moxing as mox
