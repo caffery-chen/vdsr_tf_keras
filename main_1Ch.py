@@ -1,7 +1,7 @@
 import os
 from nn_utility import *
 from VDSR import VDSR
-from ConvDnnNet import ConvNet
+from ConvNet import ConvNet
 import numpy as np
 import scipy.io as sio
 import moxing as mox
@@ -12,11 +12,14 @@ import datetime
 import tensorflow as tf
 import traceback
 
-def data_preprocessing(data_path):
+def data_preprocessing(data_path, eq=True):
     f = os.listdir(data_path)
     for mat_file in f:
         try:
-            a =single_file_proc(os.path.join(data_path, mat_file))
+            if eq:
+                a = single_eq_file_proc(os.path.join(data_path, mat_file))
+            else:
+                a =single_file_proc(os.path.join(data_path, mat_file))
         except:
             print(traceback.format_exc())
             print('%s has problem.' % mat_file)
@@ -28,7 +31,8 @@ def single_file_proc(single_data_path):
     frame_tested = int(np.size(tmp['RxPreambleArray_NN'][0][0],0)/24)
     kMemPol = tmp['kMemPol'][0][0]
     for frame in range(0, frame_tested):
-        y_data = x_data = np.zeros(shape=[74 + 24, 180, 12]) + 1j * np.zeros(shape=[74 + 24, 180, 12])
+        x_data = np.zeros(shape=[74 + 24, 180, 12]) + 1j * np.zeros(shape=[74 + 24, 180, 12])
+        y_data = np.zeros(shape=[74 + 24, 180, 12]) + 1j * np.zeros(shape=[74 + 24, 180, 12])
         for tri in range(0, 12):
             x_data[0:24,:,  tri] =tmp['RxPreambleArray_NN'][tri][0][0 + frame * 24: 24 + frame * 24, :]
             x_data[24:98,:,  tri] = tmp['RxPayloadArray_NN'][tri][0][0 + frame * 74 : 74 + frame * 74 , :]
@@ -42,6 +46,83 @@ def single_file_proc(single_data_path):
         
         sio.savemat('%s\\complete_frame\\%s_cframe_%d.mat'%(os.path.dirname(os.path.dirname(single_data_path)),
                                                           os.path.basename(single_data_path).split('.mat')[0],frame_calc), {'x_data':x_data, 'y_data':y_data})
+
+
+def single_eq_file_proc(single_data_path):
+    tmp = sio.loadmat(single_data_path)
+    frame_tested = int(np.size(tmp['RxPayloadArrayEq_NN'][0][0], 0) / 52)
+    kMemPol = tmp['kMemPol'][0][0]
+    for frame in range(0, frame_tested):
+        x_data = np.zeros(shape=[52, 180, 12]) + 1j * np.zeros(shape=[52, 180, 12])
+        y_data = np.zeros(shape=[52, 180, 12]) + 1j * np.zeros(shape=[52, 180, 12])
+        for tri in range(0, 12):
+            x_data[:, :, tri] = tmp['RxPayloadArrayEq_NN'][0][tri][0 + frame * 52: 52 + frame * 52, :]
+            fut = tmp['TxPayloadArray_NN'][tri][0][frame * 74:(frame + 1) * 74, :]
+            y_data[:, :, tri] = fut[tri * 2: 52 + tri * 2, :]
+
+        y_data1 = np.reshape(y_data, [52, 1, 180, 12])
+        y_data1 = np.concatenate([np.real(y_data1), np.imag(y_data1)], axis=2)
+        frame_calc = calc_ber_eq(y_data1)
+
+        sio.savemat('%s\\complete_frame_eq\\%s_cframe_%d.mat' % (os.path.dirname(os.path.dirname(single_data_path)),
+                                                              os.path.basename(single_data_path).split('.mat')[0],
+                                                              frame_calc), {'x_data': x_data, 'y_data': y_data})
+
+
+def calc_ber(y_predict):
+    frame_length = 98
+    rx_symbol = y_predict[:, 0, 0:180, :] + 1j * y_predict[:, 0, 180:360, :]
+    frames_tested = int(np.size(y_predict, 0) / frame_length)
+
+    ber = np.zeros([frames_tested, 12])
+
+    for i in range(0, frames_tested):
+        fut = rx_symbol[i * frame_length + 24:(i + 1) * frame_length, :, :]
+
+        for Tri in range(0, 12):
+            output_bits = qam_demod(fut[Tri * 2: 52 + Tri * 2, :, Tri])
+            best_ber = 1
+            for frame_idx in range(1, 11):
+                payload_bits = sio.loadmat("./payload_bits/bits_frame_%d.mat" % frame_idx)['Payload_bits']
+                total_num_bits = output_bits.size
+                total_error = np.sum(np.sum(np.abs(output_bits - payload_bits), 0))
+                ber_frame_idx = total_error / total_num_bits
+                if best_ber > ber_frame_idx:
+                    best_ber = ber_frame_idx
+                    k = frame_idx
+
+            print('Matched Frame Index %d; Frame#%d/%d; Tri:%d/%d: BER = %e' % (
+            k, i + 1, frames_tested, Tri + 1, 12, best_ber))
+            ber[i, Tri] = best_ber
+    return k
+
+
+def calc_ber_eq(y_predict):
+    frame_length = 52
+    rx_symbol = y_predict[:, 0, 0:180, :] + 1j * y_predict[:, 0, 180:360, :]
+    frames_tested = int(np.size(y_predict, 0) / frame_length)
+
+    ber = np.zeros([frames_tested, 12])
+
+    for i in range(0, frames_tested):
+        fut = rx_symbol[i * frame_length:(i + 1) * frame_length, :, :]
+
+        for Tri in range(0, 12):
+            output_bits = qam_demod(fut[:,:, Tri])
+            best_ber = 1
+            for frame_idx in range(1, 11):
+                payload_bits = sio.loadmat("./payload_bits/bits_frame_%d.mat" % frame_idx)['Payload_bits']
+                total_num_bits = output_bits.size
+                total_error = np.sum(np.sum(np.abs(output_bits - payload_bits), 0))
+                ber_frame_idx = total_error / total_num_bits
+                if best_ber > ber_frame_idx:
+                    best_ber = ber_frame_idx
+                    k = frame_idx
+
+            print('Matched Frame Index %d; Frame#%d/%d; Tri:%d/%d: BER = %e' % (
+                k, i + 1, frames_tested, Tri + 1, 12, best_ber))
+            ber[i, Tri] = best_ber
+    return k
 
 def get_data_by_frame(file_path, frame_idx, usage):
     f = os.listdir(file_path)
@@ -129,43 +210,18 @@ def qam_demod(c_number):
     output_bits[1::2, :] = imag_part_bit.astype(int)
     
     return output_bits    
-    
-def calc_ber(y_predict):
-    
-    frame_length = 98
-    rx_symbol = y_predict[:,0,0:180,:] + 1j * y_predict[:,0,180:360,:]
-    frames_tested = int(np.size(y_predict,0)/frame_length)
-    
-    ber = np.zeros([frames_tested,12])
-    rx_payload = []
-    
-    for i in range(0, frames_tested):        
-        fut = rx_symbol[i*frame_length + 24:(i+1)*frame_length,:,:]       
-        
-        for Tri in range(0,12):
-            output_bits = qam_demod(fut[Tri * 2 : 52 + Tri * 2,:,Tri])
-            kMem = 0
-            best_ber =1            
-            for frame_idx in range(1,11):
-                payload_bits = sio.loadmat("./payload_bits/bits_frame_%d.mat" % frame_idx)['Payload_bits']
-                total_num_bits = output_bits.size
-                total_error = np.sum(np.sum(np.abs(output_bits-payload_bits),0))
-                ber_frame_idx = total_error / total_num_bits
-                if best_ber>ber_frame_idx:
-                    best_ber = ber_frame_idx
-                    k=frame_idx
-            
-            print('Matched Frame Index %d; Frame#%d/%d; Tri:%d/%d: BER = %e' % (k, i+1, frames_tested, Tri+1, 12, best_ber))
-            ber[i, Tri] = best_ber
-    return k
-            
+
 def chkmkdir(path):
     if not os.path.exists(path):
         os.mkdir(path)
 
 def create_framewise_database():
     data_path = r'C:\\FMF_NN_EQ\\ori_frame'
-    training_data = data_preprocessing(data_path)
+    training_data = data_preprocessing(data_path, eq=False)
+
+def create_framewise_eq_database():
+    data_path = r'C:\\FMF_NN_EQ\\ori_frame_eq'
+    training_data = data_preprocessing(data_path, eq=True)
 
 def main(nn_type='ConvNet', d= 64, s=32, m=5, epoch = 2000, lr = 0.001, batch_size =256):    
     now = datetime.datetime.now()      
@@ -188,5 +244,5 @@ def main(nn_type='ConvNet', d= 64, s=32, m=5, epoch = 2000, lr = 0.001, batch_si
     train_model(training_data, test_data, val_data, model, tf.train.AdamOptimizer(0.001),epoch, batch_size, log_dir)
     
 if __name__ == '__main__':
-    main(nn_type = 'ConvNet')
-
+    # main(nn_type = 'ConvNet')
+    create_framewise_eq_database()
